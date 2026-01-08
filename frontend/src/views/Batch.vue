@@ -351,13 +351,40 @@ const viewResult = (result) => {
   showDetailDialog.value = true
 }
 
-const goToAnnotation = (result) => {
-  // 保存结果到本地存储，然后跳转
+const goToAnnotation = async (result) => {
+  // 先保存标注数据，然后跳转
   if (result.image_id) {
-    router.push({
-      path: '/detection',
-      query: { imageId: result.image_id }
-    })
+    try {
+      // 保存当前检测结果作为标注
+      await api.saveAnnotations({
+        image_id: result.image_id,
+        image_path: result.image_path,
+        image_width: result.image_width,
+        image_height: result.image_height,
+        annotations: (result.detections || []).map(d => ({
+          id: d.id,
+          class_id: d.class_id,
+          class_name: d.class_name,
+          bbox: d.bbox,
+          is_manual: false,
+          confidence: d.confidence
+        }))
+      })
+      
+      router.push({
+        path: '/detection',
+        query: { imageId: result.image_id }
+      })
+    } catch (error) {
+      console.error('保存标注失败:', error)
+      // 即使保存失败也尝试跳转
+      router.push({
+        path: '/detection',
+        query: { imageId: result.image_id }
+      })
+    }
+  } else {
+    ElMessage.warning('该图像没有有效的ID，无法跳转')
   }
   showDetailDialog.value = false
 }

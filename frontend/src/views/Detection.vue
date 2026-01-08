@@ -264,9 +264,12 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Check, Download, RefreshRight, VideoPlay } from '@element-plus/icons-vue'
 import api from '@/api'
+
+const route = useRoute()
 
 // 状态
 const canvas = ref(null)
@@ -358,7 +361,69 @@ onMounted(async () => {
   
   // 监听窗口大小变化
   window.addEventListener('resize', handleResize)
+  
+  // 检查是否有从其他页面传来的 imageId 参数
+  const imageId = route.query.imageId
+  if (imageId) {
+    await loadImageById(imageId)
+  }
 })
+
+// 通过 imageId 加载图像和标注
+const loadImageById = async (imageId) => {
+  try {
+    // 获取标注信息
+    const res = await api.getAnnotations(imageId)
+    const data = res.data
+    
+    if (data.image_path) {
+      // 加载图像
+      image = new Image()
+      image.crossOrigin = 'anonymous'
+      
+      image.onload = () => {
+        hasImage.value = true
+        imageWidth.value = image.width
+        imageHeight.value = image.height
+        currentImageId.value = imageId
+        currentImagePath.value = data.image_path
+        
+        // 加载标注
+        if (data.annotations && data.annotations.length > 0) {
+          annotations.value = data.annotations.map(ann => ({
+            id: ann.id || Date.now() + Math.random(),
+            class_id: ann.class_id,
+            class_name: ann.class_name,
+            confidence: ann.confidence,
+            is_manual: ann.is_manual,
+            bbox: ann.bbox
+          }))
+        } else {
+          annotations.value = []
+        }
+        
+        selectedAnnotation.value = null
+        
+        nextTick(() => {
+          fitToCanvas()
+          draw()
+        })
+        
+        ElMessage.success('图像加载成功')
+      }
+      
+      image.onerror = () => {
+        ElMessage.error('图像加载失败')
+      }
+      
+      // 设置图像源 - 需要使用正确的 URL
+      image.src = data.image_path.startsWith('/') ? data.image_path : `/uploads/images/${imageId}`
+    }
+  } catch (error) {
+    console.error('加载图像失败:', error)
+    ElMessage.error('加载图像失败: ' + (error.response?.data?.detail || error.message))
+  }
+}
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
