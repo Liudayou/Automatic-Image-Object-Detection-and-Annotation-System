@@ -30,7 +30,7 @@ class AnnotationService:
             "image_path": request.image_path,
             "image_width": request.image_width,
             "image_height": request.image_height,
-            "annotations": [ann.model_dump() for ann in request.annotations],
+            "annotations": [ann.dict() for ann in request.annotations],
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }

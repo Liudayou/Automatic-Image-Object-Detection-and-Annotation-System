@@ -130,7 +130,7 @@
               :key="img.path"
               class="preview-item"
             >
-              <img :src="'file://' + img.path" @error="handleImageError" />
+              <img :src="getImageUrl(img.path)" @error="handleImageError" />
               <div class="image-name">{{ img.name }}</div>
             </div>
             <el-empty v-if="previewImages.length === 0" description="暂无图像" />
@@ -396,6 +396,15 @@ const getTypeTag = (type) => {
     'custom': 'warning'
   }
   return types[type] || 'info'
+}
+
+const getImageUrl = (path) => {
+  // 如果已经是URL路径，直接返回
+  if (path.startsWith('/') || path.startsWith('http')) {
+    return path
+  }
+  // 否则构建URL
+  return `/api${path}`
 }
 
 const handleImageError = (e) => {

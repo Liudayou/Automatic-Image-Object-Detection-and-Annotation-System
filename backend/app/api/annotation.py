@@ -85,7 +85,7 @@ async def update_annotation(
     found = False
     for i, ann in enumerate(data["annotations"]):
         if ann["id"] == annotation_id:
-            data["annotations"][i] = annotation.model_dump()
+            data["annotations"][i] = annotation.dict()
             found = True
             break
     
@@ -156,7 +156,7 @@ async def add_annotation(image_id: str, annotation: Annotation):
     annotation.id = max_id + 1
     annotation.is_manual = True
     
-    data["annotations"].append(annotation.model_dump())
+    data["annotations"].append(annotation.dict())
     
     # 保存更新
     from datetime import datetime

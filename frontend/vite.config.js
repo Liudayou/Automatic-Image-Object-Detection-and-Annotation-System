@@ -35,6 +35,14 @@ export default defineConfig({
       '/exports': {
         target: 'http://localhost:8000',
         changeOrigin: true
+      },
+      '/datasets': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
+      },
+      '/custom_datasets': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
       }
     }
   }

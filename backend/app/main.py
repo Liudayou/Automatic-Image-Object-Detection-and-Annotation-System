@@ -38,6 +38,16 @@ app.add_middleware(
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 app.mount("/exports", StaticFiles(directory=settings.EXPORT_DIR), name="exports")
 
+# 数据集静态文件服务
+from app.config import DATASET_DIR
+app.mount("/datasets", StaticFiles(directory=str(DATASET_DIR)), name="datasets")
+
+# 自定义数据集静态文件服务
+import os
+custom_datasets_dir = settings.CUSTOM_DATASET_DIR
+if os.path.exists(custom_datasets_dir):
+    app.mount("/custom_datasets", StaticFiles(directory=custom_datasets_dir), name="custom_datasets")
+
 # 注册路由
 app.include_router(detection.router, prefix="/api/detection", tags=["目标检测"])
 app.include_router(annotation.router, prefix="/api/annotation", tags=["标注管理"])

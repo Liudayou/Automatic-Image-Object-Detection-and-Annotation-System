@@ -36,7 +36,7 @@ async def list_datasets():
             })
     
     # 检查 VOC 数据集
-    voc_yaml = YOLOV5_DIR / "data" / "VOC.yaml"
+    voc_yaml = DATASET_DIR / "VOC" / "VOC.yaml"
     if voc_yaml.exists():
         with open(voc_yaml, 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f)
@@ -75,17 +75,22 @@ async def get_dataset_info(dataset_name: str):
     """
     # 查找数据集配置文件
     yaml_path = None
+    dataset_base_dir = None
     
     # 检查预定义数据集
-    if dataset_name.lower() == "coco":
+    dataset_name_lower = dataset_name.lower().replace(" ", "")
+    if dataset_name_lower == "coco":
         yaml_path = DATASET_DIR / "coco" / "coco.yaml"
-    elif dataset_name.lower() == "voc":
-        yaml_path = YOLOV5_DIR / "data" / "VOC.yaml"
+        dataset_base_dir = DATASET_DIR / "coco"
+    elif dataset_name_lower in ["voc", "pascalvoc"]:
+        yaml_path = DATASET_DIR / "VOC" / "VOC.yaml"
+        dataset_base_dir = DATASET_DIR / "VOC"
     else:
         # 检查自定义数据集
         custom_path = Path(settings.CUSTOM_DATASET_DIR) / f"{dataset_name}.yaml"
         if custom_path.exists():
             yaml_path = custom_path
+            dataset_base_dir = custom_path.parent
     
     if not yaml_path or not yaml_path.exists():
         raise HTTPException(status_code=404, detail="数据集不存在")
@@ -96,31 +101,42 @@ async def get_dataset_info(dataset_name: str):
     # 统计图像数量
     train_count = val_count = test_count = 0
     
-    train_path = config.get("train", "")
-    val_path = config.get("val", "")
-    test_path = config.get("test", "")
+    train_paths = config.get("train", "")
+    val_paths = config.get("val", "")
+    test_paths = config.get("test", "")
     
-    # 尝试统计图像数量
-    for path, count_name in [(train_path, "train"), (val_path, "val"), (test_path, "test")]:
-        if path:
+    # 辅助函数：统计目录中的图像数量
+    def count_images_in_paths(paths, base_dir):
+        """统计路径（可以是单个路径或路径列表）中的图像数量"""
+        if not paths:
+            return 0
+        
+        # 确保是列表
+        if isinstance(paths, str):
+            paths = [paths]
+        
+        total = 0
+        for path in paths:
             full_path = Path(path)
             if not full_path.is_absolute():
-                full_path = yaml_path.parent / path
+                full_path = base_dir / path
             
-            if full_path.exists():
-                count = len(list(full_path.glob("*.jpg"))) + len(list(full_path.glob("*.png")))
-                if count_name == "train":
-                    train_count = count
-                elif count_name == "val":
-                    val_count = count
-                else:
-                    test_count = count
+            if full_path.exists() and full_path.is_dir():
+                total += len(list(full_path.glob("*.jpg")))
+                total += len(list(full_path.glob("*.jpeg")))
+                total += len(list(full_path.glob("*.png")))
+        
+        return total
+    
+    train_count = count_images_in_paths(train_paths, dataset_base_dir)
+    val_count = count_images_in_paths(val_paths, dataset_base_dir)
+    test_count = count_images_in_paths(test_paths, dataset_base_dir)
     
     return {
         "name": dataset_name,
         "path": str(yaml_path),
         "classes": config.get("names", []),
-        "num_classes": config.get("nc", 0),
+        "num_classes": config.get("nc", len(config.get("names", [])) if isinstance(config.get("names"), (list, dict)) else 0),
         "split": {
             "train": train_count,
             "val": val_count,
@@ -271,25 +287,52 @@ async def list_dataset_images(
     """
     # 查找数据集目录
     dataset_dir = Path(settings.CUSTOM_DATASET_DIR) / dataset_name
+    is_voc = False
+    is_coco = False
     
     if not dataset_dir.exists():
         # 检查预定义数据集
-        if dataset_name.lower() == "coco":
+        dataset_name_lower = dataset_name.lower().replace(" ", "")
+        if dataset_name_lower == "coco":
             dataset_dir = DATASET_DIR / "coco"
-        elif dataset_name.lower() == "voc":
+            is_coco = True
+        elif dataset_name_lower in ["voc", "pascalvoc"]:
             dataset_dir = DATASET_DIR / "VOC"
+            is_voc = True
     
     if not dataset_dir.exists():
-        raise HTTPException(status_code=404, detail="数据集不存在")
+        raise HTTPException(status_code=404, detail=f"数据集目录不存在: {dataset_dir}")
     
-    images_dir = dataset_dir / "images" / split
-    if not images_dir.exists():
-        return {"images": [], "total": 0}
-    
-    # 获取图像列表
+    # 查找图像目录
     images = []
-    for ext in ["*.jpg", "*.jpeg", "*.png", "*.bmp"]:
-        images.extend(images_dir.glob(ext))
+    images_dir = dataset_dir / "images"
+    
+    if not images_dir.exists():
+        raise HTTPException(status_code=404, detail=f"图像目录不存在: {images_dir}")
+    
+    if is_voc:
+        # VOC 数据集特殊处理: train2007, train2012, val2007, val2012 等
+        # 根据 split 匹配对应目录（train 匹配 train2007, train2012; val 匹配 val2007, val2012; test 匹配 test2007）
+        for subdir in images_dir.iterdir():
+            if subdir.is_dir() and subdir.name.startswith(split):
+                for ext in ["*.jpg", "*.jpeg", "*.png", "*.bmp"]:
+                    images.extend(subdir.glob(ext))
+    elif is_coco:
+        # COCO 数据集: train2017, val2017, test2017
+        split_dir = images_dir / f"{split}2017"
+        if split_dir.exists():
+            for ext in ["*.jpg", "*.jpeg", "*.png", "*.bmp"]:
+                images.extend(split_dir.glob(ext))
+    else:
+        # 自定义数据集
+        split_dir = images_dir / split
+        if split_dir.exists():
+            for ext in ["*.jpg", "*.jpeg", "*.png", "*.bmp"]:
+                images.extend(split_dir.glob(ext))
+        elif images_dir.exists():
+            # 直接在 images 目录下查找
+            for ext in ["*.jpg", "*.jpeg", "*.png", "*.bmp"]:
+                images.extend(images_dir.glob(ext))
     
     # 排序
     images = sorted(images, key=lambda x: x.name)
@@ -300,8 +343,22 @@ async def list_dataset_images(
     end = start + page_size
     paginated = images[start:end]
     
+    # 转换路径为URL
+    def get_image_url(img_path: Path) -> str:
+        # 获取相对于数据集目录的路径
+        try:
+            rel_path = img_path.relative_to(DATASET_DIR)
+            return f"/datasets/{rel_path.as_posix()}"
+        except ValueError:
+            # 自定义数据集
+            try:
+                rel_path = img_path.relative_to(Path(settings.CUSTOM_DATASET_DIR))
+                return f"/custom_datasets/{rel_path.as_posix()}"
+            except ValueError:
+                return str(img_path)
+    
     return {
-        "images": [{"name": img.name, "path": str(img)} for img in paginated],
+        "images": [{"name": img.name, "path": get_image_url(img)} for img in paginated],
         "total": total,
         "page": page,
         "page_size": page_size

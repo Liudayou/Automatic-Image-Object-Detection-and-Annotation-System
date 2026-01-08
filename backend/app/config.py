@@ -9,7 +9,7 @@ from typing import List
 # 项目根目录
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 YOLOV5_DIR = BASE_DIR / "yolov5"
-DATASET_DIR = BASE_DIR / "dataset"
+DATASET_DIR = BASE_DIR / "datasets"
 
 @dataclass
 class Settings:
