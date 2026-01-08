@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Uploads and temp files
+uploads/images/*
+uploads/temp/*
+uploads/augmented/*
+uploads/annotations/*
+!uploads/*/.gitkeep
+
+# Exports
+exports/*
+!exports/.gitkeep
+
+# Dataset (too large)
+dataset/
+datasets/
+custom_datasets/
+
+# YOLOv5 weights (too large)
+yolov5/*.pt
+yolov5/weights/*.pt
+yolov5/runs/
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
